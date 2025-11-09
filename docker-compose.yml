@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aidia_development}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: quay.io/minio/minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  api:
+    build:
+      context: ./apps/api
+    env_file: .env
+    depends_on:
+      - db
+      - redis
+      - minio
+    volumes:
+      - ./apps/api:/rails
+      - bundle_cache:/usr/local/bundle
+      - storage:/rails/storage
+    ports:
+      - "3000:3000"
+    environment:
+      RAILS_ENV: development
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      ACTIVE_STORAGE_SERVICE: ${ACTIVE_STORAGE_SERVICE:-minio}
+      MINIO_ENDPOINT: http://minio:9000
+    command: ./bin/rails server -b 0.0.0.0 -p 3000
+
+  worker:
+    build:
+      context: ./apps/api
+    env_file: .env
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./apps/api:/rails
+      - bundle_cache:/usr/local/bundle
+      - storage:/rails/storage
+    environment:
+      RAILS_ENV: development
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+    command: bundle exec sidekiq -C config/sidekiq.yml
+
+  web:
+    build:
+      context: ./apps/web
+    env_file: .env
+    depends_on:
+      - api
+    working_dir: /app
+    command: pnpm dev --host 0.0.0.0 --port 5173
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
+  bundle_cache:
+  storage:
