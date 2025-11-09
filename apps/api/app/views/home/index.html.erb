@@ -1,0 +1,9 @@
+<main class="mx-auto max-w-3xl py-16 px-6 font-sans">
+  <h1 class="text-3xl font-bold mb-4">AiDia 管理パネル</h1>
+  <p class="text-gray-600 mb-2">バックエンドは正常に起動しています。</p>
+  <ul class="list-disc ml-6 text-sm text-gray-700 space-y-1">
+    <li>現在時刻: <%= Time.current %></li>
+    <li>Rails: <%= Rails.version %></li>
+    <li>Git: <%= @version %></li>
+  </ul>
+</main>

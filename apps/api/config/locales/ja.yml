@@ -1,0 +1,11 @@
+ja:
+  devise:
+    confirmations:
+      confirmed: "メールアドレスが確認されました。"
+  activerecord:
+    models:
+      diary_entry: "日記"
+    attributes:
+      diary_entry:
+        title: "タイトル"
+        body: "本文"

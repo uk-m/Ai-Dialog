@@ -1,0 +1,7 @@
+:concurrency: <%= ENV.fetch("SIDEKIQ_CONCURRENCY", 10) %>
+:queues:
+  - critical
+  - default
+  - ingestion
+  - drafting
+  - digests
