@@ -1,0 +1,31 @@
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node / frontend
+node_modules/
+apps/web/node_modules/
+apps/web/dist/
+
+# Ruby / backend
+vendor/bundle
+log/
+tmp/
+storage/
+coverage/
+.bundle/
+
+# Docker / Compose
+*.pid
+*.pid.lock
+
+# Misc
+*.log
+*.tmp

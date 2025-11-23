@@ -41,6 +41,9 @@ Rails.application.routes.draw do
     end
   end
 
-  Sidekiq::Web.set :session_secret, Rails.application.secret_key_base
+  Sidekiq::Web.use Rack::Session::Cookie,
+                   key: "_sidekiq.session",
+                   same_site: :lax,
+                   secret: Rails.application.secret_key_base
   mount Sidekiq::Web => "/sidekiq"
 end

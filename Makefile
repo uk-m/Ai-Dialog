@@ -1,14 +1,21 @@
-COMPOSE = docker compose
-APP_ENV ?= development
+COMPOSE ?= docker compose
+ENV_FILE ?= .env
 
 .PHONY: bootstrap
 bootstrap:
-	@if [ ! -f .env ]; then cp .env.example .env; fi
+	@if [ ! -f $(ENV_FILE) ]; then cp .env.example $(ENV_FILE); fi
 	$(COMPOSE) build
-	$(COMPOSE) run --rm api bundle exec rails db:setup
+	$(COMPOSE) run --rm web bundle install
+	$(COMPOSE) run --rm web bin/rails db:prepare
+	$(COMPOSE) run --rm web bin/rails db:seed
+	$(COMPOSE) run --rm frontend pnpm install
 
 .PHONY: up
 up:
+	$(COMPOSE) up
+
+.PHONY: up-build
+up-build:
 	$(COMPOSE) up --build
 
 .PHONY: down
@@ -21,20 +28,24 @@ logs:
 
 .PHONY: console
 console:
-	$(COMPOSE) run --rm api bundle exec rails console
+	$(COMPOSE) run --rm web bin/rails console
 
 .PHONY: db-shell
 db-shell:
 	$(COMPOSE) exec db psql -U $$POSTGRES_USER $$POSTGRES_DB
 
-.PHONY: lint-api
-lint-api:
-	cd apps/api && bundle exec rubocop
+.PHONY: lint-backend
+lint-backend:
+	$(COMPOSE) run --rm web bundle exec rubocop
 
-.PHONY: lint-web
-lint-web:
-	cd apps/web && pnpm lint
+.PHONY: lint-frontend
+lint-frontend:
+	$(COMPOSE) run --rm frontend pnpm lint
+
+.PHONY: test
+test:
+	$(COMPOSE) run --rm web bin/rails test
 
 .PHONY: seed
 seed:
-	$(COMPOSE) run --rm api bundle exec rails db:seed
+	$(COMPOSE) run --rm web bin/rails db:seed

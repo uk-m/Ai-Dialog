@@ -7,7 +7,7 @@ export const WeeklyDigestCard = ({ digest }: { digest: WeeklyDigest }) => (
     <CardHeader>
       <CardTitle>{formatDate(digest.week_of)} 週のまとめ</CardTitle>
       <p className="text-sm text-muted-foreground">
-        {digest.published_at ? `生成日時: ${formatDate(digest.published_at)}` : "生成待ち"}
+        {digest.published_at ? `生成日: ${formatDate(digest.published_at)}` : "生成中"}
       </p>
     </CardHeader>
     <CardContent className="space-y-4">

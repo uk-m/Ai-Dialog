@@ -36,7 +36,9 @@ export const UploadPage = () => {
     <section className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">画像アップロード</h1>
-        <p className="text-sm text-muted-foreground">画像を登録するとAIが下書きを生成します。</p>
+        <p className="text-sm text-muted-foreground">
+          画像を登録すると AI が日記の下書きを自動生成します。
+        </p>
       </div>
 
       <div className="rounded-lg border bg-card p-6 shadow-sm">

@@ -1,123 +1,50 @@
 # AiDia (AI Diary)
 
-AI 写真日記サービス **AiDia** のモノレポです。Docker 上で Rails API・Sidekiq・React(Vite)・PostgreSQL・Redis・MinIO を一括で動かし、画像アップロード→EXIF/OCR 解析→OpenAI による日記ドラフト生成→公開までをサポートします。
+画像をアップロードすると EXIF/OCR/ラベルを元に AI が日記の下書きを生成するサービスです。開発環境は Docker Compose で Rails(API+Sidekiq) / React(Vite) / Postgres / Redis / MinIO を一括起動します。
 
-## ディレクトリ構成
+## 構成
+- ディレクトリ: `apps/api` (Rails 8.1 / Ruby 3.4) と `apps/web` (React + Vite + TS) のモノレポ
+- Docker サービス: `web`(Rails), `worker`(Sidekiq), `frontend`(Vite), `db`(Postgres16), `redis`, `minio`
+- 環境変数の雛形: `.env.example`（初回はこれを `.env` にコピー）
 
-```
-.
-├─ apps/
-│  ├─ api/   # Rails 8.1 (API + HTML)
-│  └─ web/   # React + Vite + Tailwind + shadcn
-├─ docker-compose.yml
-├─ Procfile.dev
-├─ Makefile
-└─ .env.example
-```
-
-## 事前準備
-
+## 前提
 - Docker / Docker Compose v2
-- Node.js 20 系（ローカルで `pnpm` を使う場合）
-- Ruby / Bundler（ローカルで直接 Rails を動かす場合）
+- (任意) ローカルで直接動かす場合は Ruby 3.4 と Node 20 / pnpm が必要
 
-※ この実行環境には `ruby` / `node` コマンドが入っていないため `bundle install` や `pnpm install` を実行できていません。各自の開発環境で依存関係を再インストールし、`apps/api/Gemfile.lock` と `apps/web/pnpm-lock.yaml` を再生成してください。
-
-## セットアップ手順
-
+## 初回セットアップ & 起動
 ```bash
-cp .env.example .env             # 初回のみ
-make bootstrap                   # 依存取得 + DB 初期化
-make up                          # Rails / Sidekiq / Vite / DB / Redis / MinIO を起動
+cp .env.example .env        # 初回のみ
+make bootstrap              # イメージ構築 + bundle install + db:prepare + seed + pnpm install
+make up                     # 全サービス起動（HMR有効）
 ```
 
-### 主な Makefile タスク
+## よく使う Make タスク
+- `make up` / `make up-build` : 立ち上げ（必要に応じて再ビルド）
+- `make down` : 停止・孤立コンテナ掃除
+- `make logs` : 全サービスのログを追う
+- `make console` : Rails コンソール
+- `make db-shell` : psql シェル
+- `make lint-backend` / `make lint-frontend` : RuboCop / ESLint
+- `make test` : Rails test
+- `make seed` : Seed データ投入
 
-| コマンド        | 説明                                         |
-|-----------------|----------------------------------------------|
-| `make up`       | Docker Compose で全サービスを起動             |
-| `make down`     | コンテナ停止 & クリーンアップ                 |
-| `make logs`     | すべてのサービスログを tail                  |
-| `make console`  | Rails console                                 |
-| `make db-shell` | PostgreSQL シェル                             |
-| `make seed`     | Seed データ投入 (`demo@aidia.local`)          |
-| `make lint-api` | RuboCop                                       |
-| `make lint-web` | eslint                                        |
-
-### エンドポイント
-
+## アクセス先
+- フロント: http://localhost:5173
 - Rails API: http://localhost:3000
-- Sidekiq Web UI: http://localhost:3000/sidekiq
-- フロント (Vite): http://localhost:5173
-- MinIO Console: http://localhost:9001 (ユーザー/パスは `.env` を参照)
+- Sidekiq Web UI: http://localhost:3000/sidekiq （Basic 認証は `.env` 参照）
+- MinIO Console: http://localhost:9001 （`.env` の MINIO_* 参照）
 
-## バックエンド概要 (apps/api)
+## 環境変数メモ
+- Rails: `DATABASE_URL`, `REDIS_URL`, `ACTIVE_STORAGE_SERVICE`, `MINIO_*`, `APP_HOST`, `FRONTEND_HOST`, `OPENAI_API_KEY`(未設定ならモック)
+- Frontend: `VITE_API_BASE_URL`, `VITE_APP_HOST`
+- Seed ユーザー（デフォルト）: `demo@aidia.local / password12345!`（`.env` で変更可）
 
-- Rails 8.1 / Ruby 3.4 / PostgreSQL / Redis
-- Devise + devise_token_auth による API 認証（ヘッダー: `access-token`, `client`, `uid` など）
-- ActiveStorage (MinIO/S3 互換) + CarrierWave 共存
-- ActiveJob + Sidekiq
-  - `DiaryIngestionJob`: ActiveStorage 画像から EXIF / 簡易 OCR / ラベル抽出
-  - `DiaryDraftJob`: OpenAI でタイトル/本文/ムード/タグを JSON schema で生成
-  - `WeeklyDigestJob`: 週次まとめを生成し `weekly_digests` に upsert
-- Seeds で `demo@aidia.local / password12345!` を作成（メール確認済み）
-- `config/initializers/openai.rb`, `carrierwave.rb`, `sidekiq.rb`, `cors.rb` などで外部サービスを一括管理
+## トラブルシュート
+- Docker デーモンに繋がらない: Docker Desktop/WSL2 を起動して `docker info` が通るか確認。
+- psych などのネイティブ拡張ビルド失敗: `Dockerfile.web` に必要な dev パッケージ（libyaml 等）を含めているので、再ビルド後に再実行。
 
-## フロントエンド概要 (apps/web)
-
-- React 19 + TypeScript + Vite
-- Tailwind CSS + shadcn 風 UI コンポーネント
-- 状態管理: Jotai (ユーザープリファレンス) / Zustand (アップロードキュー)
-- 主要ページ
-  - `/` タイムライン + 下書き一覧
-  - `/calendar` カレンダーヒートマップ
-  - `/upload` 画像アップロード & 進行状況
-  - `/weekly` 週次まとめ
-  - `/settings` Jotai 連携のプリファレンス保存
-  - `/entries/:id` 日記編集
-- `axios` クライアントは `devise_token_auth` のトークンをローカルストレージに保存し、以降の API リクエストに自動付与
-- `.env` の `VITE_API_BASE_URL` で API エンドポイントを変更可能
-
-## Docker / Compose
-
-- `api` / `worker` は同一 Rails イメージを共有し、ボリュームで `storage`, `bundle_cache` を永続化
-- `web` は `node:20-alpine` + `pnpm` ベース
-- `db`: Postgres 16, `redis`: 7, `minio`: コンソール付き
-- `make bootstrap` 時に DB を `db:setup`、MinIO には `aidia-uploads` バケットを利用
-
-## 環境変数
-
-`.env.example` に主要キーを掲載しています。最低限以下は本番用に差し替えてください。
-
-- `OPENAI_API_KEY` / `OPENAI_MODEL`
-- `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_ENDPOINT`
-- `SIDEKIQ_WEB_USERNAME` / `SIDEKIQ_WEB_PASSWORD`
-- `DEVISE_SECRET_KEY`
-
-## 認証フロー
-
-1. `POST /auth/sign_in` で `access-token`, `client`, `uid`, `expiry`, `token-type` を取得。
-2. それらをフロントの `localStorage` に保存。
-3. 以降の API リクエストで自動的にヘッダー付与。
-
-## OCR / AI について
-
-- OCR は `tesseract` CLI を呼び出しています（`ImageAnalyzer` に `TODO` コメントあり）。Vision API などに置き換える場合は同クラスを差し替えてください。
-- OpenAI 呼び出しは JSON Schema モードで強制し、失敗時はフォールバックテキストを返すようにしています。
-
-## Procfile 開発
-
-Docker を使わずにローカルで試す場合は以下。
-
+## ローカル実行（非 Docker）
 ```bash
-overmind start -f Procfile.dev
-```
-
-## 未実行の検証
-
-この環境では各ランタイムがインストールされていないため以下を実行できていません。ローカルで必ず実施してください。
-
-```bash
-cd apps/api && bundle install
-cd apps/web && pnpm install
+cd apps/api && bundle install && bin/rails db:prepare
+cd apps/web && pnpm install && pnpm dev
 ```

@@ -1,5 +1,4 @@
 class DiaryEntry < ApplicationRecord
-  include ActiveStorageValidations::Model
   MOODS = %w[happy excited calm neutral tired sad frustrated grateful].freeze
   STATUSES = {
     draft: "draft",
@@ -11,7 +10,7 @@ class DiaryEntry < ApplicationRecord
   has_many :tags, through: :diary_entry_tags
 
   has_many_attached :photos
-  validates :photos, active_storage_content_type: /\Aimage\//
+  validate :photos_must_be_images
 
   enum :status, STATUSES
 
@@ -47,5 +46,15 @@ class DiaryEntry < ApplicationRecord
 
   def set_defaults
     self.journal_date ||= Date.current
+  end
+
+  def photos_must_be_images
+    return unless photos.attached?
+
+    photos.each do |photo|
+      next if photo.content_type&.match?(%r{\Aimage/})
+
+      errors.add(:photos, "must be an image")
+    end
   end
 end

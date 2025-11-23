@@ -17,14 +17,11 @@ class OpenAiDiaryDraftService
           {
             role: "system",
             content: <<~PROMPT
-              あなたは画像とメタデータから写真日記のドラフトを作るアシスタントです。
-              出力は必ずJSON schemaに沿ってください。
+              あなたは画像とメタデータから写真日記の下書きを作るアシスタントです。
+              出力は必ず JSON schema に沿ってください。
             PROMPT
           },
-          {
-            role: "user",
-            content: prompt
-          }
+          { role: "user", content: prompt }
         ]
       }
     )
@@ -53,11 +50,21 @@ class OpenAiDiaryDraftService
   end
 
   def fallback_payload
+    label_text = analysis_payload[:labels].presence&.join(", ")
+    meta_text = analysis_payload[:metadata].presence || {}
+    camera_hint = meta_text[:camera] ? "（#{meta_text[:camera]} で撮影）" : ""
+    ocr_hint = analysis_payload[:ocr_text].present? ? "写真に写った文字として「#{analysis_payload[:ocr_text]}」を確認しました。" : ""
+
+    safe_body = <<~BODY.squish
+      今日は気ままにカメラを持って過ごしました。#{label_text ? "「#{label_text}」のような印象の一枚です。" : ""}
+      #{ocr_hint}#{camera_hint}
+    BODY
+
     {
       title: entry.title.presence || "今日の思い出",
-      body: entry.body.presence || "TODO: OpenAIの返却結果で本文を上書きしてください。",
+      body: entry.body.presence || safe_body,
       mood: "neutral",
-      summary: "画像から推測した内容で日記を下書きしました。",
+      summary: "画像の雰囲気から穏やかな一日を振り返りました。",
       tags: analysis_payload[:labels].presence || ["draft"]
     }
   end

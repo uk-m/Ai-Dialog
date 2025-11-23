@@ -1,5 +1,24 @@
 version: "3.9"
 
+x-rails-service: &rails-service
+  build:
+    context: .
+    dockerfile: Dockerfile.web
+  env_file: .env
+  environment:
+    RAILS_ENV: ${RAILS_ENV:-development}
+    DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/aidia_development}
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    ACTIVE_STORAGE_SERVICE: ${ACTIVE_STORAGE_SERVICE:-minio}
+    MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+    MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+    MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+  volumes:
+    - ./apps/api:/app
+    - bundle_cache:/bundle
+    - storage:/app/storage
+  working_dir: /app
+
 services:
   db:
     image: postgres:16
@@ -35,60 +54,37 @@ services:
     volumes:
       - minio_data:/data
 
-  api:
-    build:
-      context: ./apps/api
-    env_file: .env
+  web:
+    <<: *rails-service
     depends_on:
       - db
       - redis
       - minio
-    volumes:
-      - ./apps/api:/rails
-      - bundle_cache:/usr/local/bundle
-      - storage:/rails/storage
     ports:
       - "3000:3000"
-    environment:
-      RAILS_ENV: development
-      POSTGRES_HOST: db
-      REDIS_URL: redis://redis:6379/0
-      ACTIVE_STORAGE_SERVICE: ${ACTIVE_STORAGE_SERVICE:-minio}
-      MINIO_ENDPOINT: http://minio:9000
-    command: ./bin/rails server -b 0.0.0.0 -p 3000
+    command: bash -lc "bin/rails db:prepare && bin/rails db:seed && bin/rails server -b 0.0.0.0 -p 3000"
 
   worker:
-    build:
-      context: ./apps/api
-    env_file: .env
+    <<: *rails-service
     depends_on:
       - db
       - redis
-    volumes:
-      - ./apps/api:/rails
-      - bundle_cache:/usr/local/bundle
-      - storage:/rails/storage
-    environment:
-      RAILS_ENV: development
-      POSTGRES_HOST: db
-      REDIS_URL: redis://redis:6379/0
     command: bundle exec sidekiq -C config/sidekiq.yml
 
-  web:
+  frontend:
     build:
-      context: ./apps/web
+      context: .
+      dockerfile: Dockerfile.frontend
     env_file: .env
-    depends_on:
-      - api
     working_dir: /app
+    depends_on:
+      - web
     command: pnpm dev --host 0.0.0.0 --port 5173
     volumes:
       - ./apps/web:/app
-      - /app/node_modules
+      - frontend_node_modules:/app/node_modules
     ports:
       - "5173:5173"
-    environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
 
 volumes:
   pg_data:
@@ -96,3 +92,4 @@ volumes:
   minio_data:
   bundle_cache:
   storage:
+  frontend_node_modules:

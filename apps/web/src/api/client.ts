@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { API_BASE_URL } from "../config";
 
 const TOKEN_STORAGE_KEY = "aidia.tokens";
@@ -41,14 +41,22 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-apiClient.interceptors.response.use((response) => {
-  const authHeaders = {
-    "access-token": response.headers["access-token"],
-    client: response.headers.client,
-    expiry: response.headers.expiry,
-    uid: response.headers.uid,
-    "token-type": response.headers["token-type"],
-  };
-  persistAuthHeaders(authHeaders);
-  return response;
-});
+apiClient.interceptors.response.use(
+  (response) => {
+    const authHeaders = {
+      "access-token": response.headers["access-token"],
+      client: response.headers.client,
+      expiry: response.headers.expiry,
+      uid: response.headers.uid,
+      "token-type": response.headers["token-type"],
+    };
+    persistAuthHeaders(authHeaders);
+    return response;
+  },
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+    return Promise.reject(error);
+  }
+);

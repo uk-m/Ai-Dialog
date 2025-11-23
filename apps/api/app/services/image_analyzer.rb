@@ -80,7 +80,7 @@ class ImageAnalyzer
 
     nil
   rescue Errno::ENOENT
-    # TODO: switch to a managed OCR service (Google Vision, Azure AI Vision, etc.)
+    Rails.logger.info("[ImageAnalyzer] tesseract not found; skipping OCR and continuing without text")
     nil
   end
 end
